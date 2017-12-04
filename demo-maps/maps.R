@@ -3,10 +3,6 @@ library(dplyr)
 library(doParallel)
 library(foreach)
 
-## jpg figure size
-width <- 1100
-height <- 1000
-
 mapPlot <- function(data,
                     year = "1960-07-01",
                     var="airtemp",
@@ -26,19 +22,10 @@ mapPlot <- function(data,
       scale_fill_gradient(low="gray10", high="orangered1", na.value="slateblue3", name=legend) +
       labs(x = "longitude (deg E)", y = "latitude (deg N)", title = title)
    pdf(file=fName, width=180/15.4, height=180/25.4)
+                           # note: this will be saved on the worker's node
    print(p)
    dev.off()
    "success :-)"
-}
-
-extractData <- function() {
-   ## use this function to read the original large data only.
-   ## In production, use the already extracted small dataset
-   ## 
-   data <- data.table::fread("pbzip2 -dc data/temp_prec_1960+.csv.bz2") %>%
-      dplyr::filter(dplyr::between(longitude, 190, 350),
-                    dplyr::between(latitude, 10, 80)) %>%
-      dplyr::filter(time %in% c("1960-07-01", "1987-07-01", "2014-07-01"))
 }
 
 loadData <- function() {
@@ -60,12 +47,23 @@ loopPlot <- function() {
       mapPlot(data, pd$year, pd$var, pd$title, pd$legend, pd$fName)
    }
 }
-   
+
 mcLoopPlot <- function(n) {
    registerDoParallel(cores=n)
    l <- foreach(pd = iter(plotData, "row")) %dopar% {
       mapPlot(data, pd$year, pd$var, pd$title, pd$legend, pd$fName)
    }
+}
+
+sockLoopPlot <- function(n) {
+   cl <- makeCluster(n)
+   registerDoParallel(cl)
+   clusterExport(cl, c("data", "mapPlot"))
+                           # independent processes do not share data
+   l <- foreach(pd = iter(plotData, "row")) %dopar% {
+      mapPlot(data, pd$year, pd$var, pd$title, pd$legend, pd$fName)
+   }
+   stopCluster(cl)
 }
 
 clusterLoopPlot <- function() {
