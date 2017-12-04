@@ -15,6 +15,7 @@ knn1 <- function(train, test, n=nrow(test), k=1) {
    testLabels <- test$label
    ##
    predLabels <- foreach(pixels = iter(testPixels, by="row"), .combine=c, .verbose=FALSE) %do% {
+      print(dim(pixels))
       FNN::knn(trainPixels, pixels, trainLabels, k=k)
    }
    print(predLabels)
